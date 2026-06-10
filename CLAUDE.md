@@ -73,6 +73,7 @@ export default defineConfig({
 | `docs/design/phase1.md` | Phase 1 | 게임 캔버스 & 플레이어 이동 |
 | `docs/design/phase2.md` | Phase 2 | 풍선 물리 (바운스) |
 | `docs/design/phase3.md` | Phase 3 | 작살 발사 & 풍선 분열 |
+| `docs/design/phase4.md` | Phase 4 | 충돌 판정 & 목숨 시스템 |
 
 > Phase가 추가될 때마다 위 표에 행을 추가한다.
 

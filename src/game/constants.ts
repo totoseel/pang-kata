@@ -44,3 +44,6 @@ export const NEXT_SIZE: Record<BalloonSize, BalloonSize | null> = {
 }
 
 export const HARPOON_SPEED = 10
+
+export const PLAYER_LIVES = 3
+export const INVINCIBLE_FRAMES = 120

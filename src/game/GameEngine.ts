@@ -2,7 +2,7 @@ import { InputManager } from './InputManager'
 import { Player } from './entities/Player'
 import { Balloon } from './entities/Balloon'
 import { Harpoon } from './entities/Harpoon'
-import { CANVAS_HEIGHT, CANVAS_WIDTH } from './constants'
+import { CANVAS_HEIGHT, CANVAS_WIDTH, PLAYER_LIVES } from './constants'
 
 function harpoonHitsBalloon(harpoon: Harpoon, balloon: Balloon): boolean {
   if (harpoon.x < balloon.x - balloon.radius) return false
@@ -14,12 +14,22 @@ function harpoonHitsBalloon(harpoon: Harpoon, balloon: Balloon): boolean {
   return dx * dx + dy * dy <= balloon.radius * balloon.radius
 }
 
+function playerHitsBalloon(player: Player, balloon: Balloon): boolean {
+  const nearestX = Math.max(player.x, Math.min(balloon.x, player.x + player.width))
+  const nearestY = Math.max(player.y, Math.min(balloon.y, player.y + player.height))
+  const dx = balloon.x - nearestX
+  const dy = balloon.y - nearestY
+  return dx * dx + dy * dy < balloon.radius * balloon.radius
+}
+
 export class GameEngine {
   private ctx: CanvasRenderingContext2D
   private input: InputManager
   private player: Player
   private balloons: Balloon[]
   private harpoon: Harpoon | null = null
+  private lives = PLAYER_LIVES
+  private state: 'playing' | 'gameover' = 'playing'
   private animFrameId = 0
 
   constructor(canvas: HTMLCanvasElement) {
@@ -46,7 +56,10 @@ export class GameEngine {
   }
 
   private update() {
+    if (this.state === 'gameover') return
+
     this.player.update(this.input)
+    this.player.tickInvincible()
 
     // 작살 발사
     if (this.input.isPressed(' ') && this.harpoon === null) {
@@ -62,13 +75,14 @@ export class GameEngine {
       if (!this.harpoon.active) this.harpoon = null
     }
 
-    // 풍선 업데이트 + 충돌 판정
-    const toRemove = new Set<Balloon>()
-    const toAdd: Balloon[] = []
-
+    // 풍선 업데이트
     for (const balloon of this.balloons) {
       balloon.update()
     }
+
+    // 작살-풍선 충돌
+    const toRemove = new Set<Balloon>()
+    const toAdd: Balloon[] = []
 
     if (this.harpoon) {
       for (const balloon of this.balloons) {
@@ -87,6 +101,21 @@ export class GameEngine {
       this.balloons.push(...toAdd)
     }
 
+    // 플레이어-풍선 충돌
+    if (!this.player.isInvincible()) {
+      for (const balloon of this.balloons) {
+        if (playerHitsBalloon(this.player, balloon)) {
+          this.lives -= 1
+          if (this.lives <= 0) {
+            this.state = 'gameover'
+          } else {
+            this.player.hit()
+          }
+          break
+        }
+      }
+    }
+
     this.input.flush()
   }
 
@@ -99,5 +128,24 @@ export class GameEngine {
     for (const balloon of this.balloons) {
       balloon.draw(this.ctx)
     }
+    this.drawHUD(this.ctx)
+    if (this.state === 'gameover') this.drawGameOver(this.ctx)
+  }
+
+  private drawHUD(ctx: CanvasRenderingContext2D) {
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold 18px monospace'
+    ctx.fillText(`♥ x${this.lives}`, 12, 24)
+  }
+
+  private drawGameOver(ctx: CanvasRenderingContext2D) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold 48px monospace'
+    ctx.textAlign = 'center'
+    ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2)
+    ctx.textAlign = 'left'
   }
 }
