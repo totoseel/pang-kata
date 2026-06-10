@@ -52,6 +52,9 @@ export class Balloon {
     }
   }
 
+  reflectX() { this.vx *= -1 }
+  reflectY() { this.vy *= -1 }
+
   getSplitBalloons(): Balloon[] {
     const nextSize = NEXT_SIZE[this.size]
     if (nextSize === null) return []

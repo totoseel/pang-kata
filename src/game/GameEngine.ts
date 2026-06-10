@@ -2,6 +2,8 @@ import { InputManager } from './InputManager'
 import { Player } from './entities/Player'
 import { Balloon } from './entities/Balloon'
 import { Harpoon } from './entities/Harpoon'
+import { Block } from './entities/Block'
+import { MISSION1_STAGES } from './stages'
 import {
   BALLOON_SCORE,
   CANVAS_HEIGHT,
@@ -14,7 +16,6 @@ import {
 function harpoonHitsBalloon(harpoon: Harpoon, balloon: Balloon): boolean {
   if (harpoon.x < balloon.x - balloon.radius) return false
   if (harpoon.x > balloon.x + balloon.radius) return false
-
   const clampedY = Math.max(harpoon.top, Math.min(harpoon.bottom, balloon.y))
   const dy = balloon.y - clampedY
   const dx = balloon.x - harpoon.x
@@ -29,15 +30,51 @@ function playerHitsBalloon(player: Player, balloon: Balloon): boolean {
   return dx * dx + dy * dy < balloon.radius * balloon.radius
 }
 
+function harpoonHitsBlock(harpoon: Harpoon, block: Block): boolean {
+  if (harpoon.x < block.x || harpoon.x > block.x + block.width) return false
+  return harpoon.top <= block.y + block.height && harpoon.bottom >= block.y
+}
+
+function balloonHitsBlock(balloon: Balloon, block: Block): boolean {
+  return (
+    balloon.x + balloon.radius > block.x &&
+    balloon.x - balloon.radius < block.x + block.width &&
+    balloon.y + balloon.radius > block.y &&
+    balloon.y - balloon.radius < block.y + block.height
+  )
+}
+
+function resolveBalloonBlock(balloon: Balloon, block: Block) {
+  const overlapLeft   = (balloon.x + balloon.radius) - block.x
+  const overlapRight  = (block.x + block.width) - (balloon.x - balloon.radius)
+  const overlapTop    = (balloon.y + balloon.radius) - block.y
+  const overlapBottom = (block.y + block.height) - (balloon.y - balloon.radius)
+
+  const minH = Math.min(overlapLeft, overlapRight)
+  const minV = Math.min(overlapTop, overlapBottom)
+
+  if (minH < minV) {
+    balloon.reflectX()
+    if (overlapLeft < overlapRight) balloon.x -= overlapLeft
+    else balloon.x += overlapRight
+  } else {
+    balloon.reflectY()
+    if (overlapTop < overlapBottom) balloon.y -= overlapTop
+    else balloon.y += overlapBottom
+  }
+}
+
 export class GameEngine {
   private ctx: CanvasRenderingContext2D
   private input: InputManager
   private player: Player
   private balloons: Balloon[]
+  private blocks: Block[]
   private harpoon: Harpoon | null = null
   private lives = PLAYER_LIVES
   private score = 0
-  private state: 'playing' | 'stageclear' | 'gameover' = 'playing'
+  private stageIndex = 0
+  private state: 'playing' | 'stageclear' | 'missioncomplete' | 'gameover' = 'playing'
   private stageClearFrames = 0
   private animFrameId = 0
 
@@ -45,8 +82,10 @@ export class GameEngine {
     this.ctx = canvas.getContext('2d')!
     this.input = new InputManager()
     this.player = new Player()
-    this.balloons = [new Balloon('large', CANVAS_WIDTH / 2, 1)]
+    this.balloons = []
+    this.blocks = []
     this.loop = this.loop.bind(this)
+    this.loadStage(0)
   }
 
   start() {
@@ -58,6 +97,25 @@ export class GameEngine {
     this.input.destroy()
   }
 
+  private loadStage(index: number) {
+    const data = MISSION1_STAGES[index]
+    this.balloons = data.balloons.map(b => new Balloon(b.size, b.x, b.vxDir))
+    this.blocks = data.blocks.map(b => new Block(b))
+    this.harpoon = null
+    this.player = new Player()
+    this.stageIndex = index
+  }
+
+  private advanceStage() {
+    const next = this.stageIndex + 1
+    if (next >= MISSION1_STAGES.length) {
+      this.state = 'missioncomplete'
+    } else {
+      this.loadStage(next)
+      this.state = 'playing'
+    }
+  }
+
   private loop() {
     this.update()
     this.draw()
@@ -65,11 +123,11 @@ export class GameEngine {
   }
 
   private update() {
-    if (this.state === 'gameover') return
+    if (this.state === 'gameover' || this.state === 'missioncomplete') return
 
     if (this.state === 'stageclear') {
       this.stageClearFrames -= 1
-      if (this.stageClearFrames <= 0) this.resetStage()
+      if (this.stageClearFrames <= 0) this.advanceStage()
       return
     }
 
@@ -95,6 +153,15 @@ export class GameEngine {
       balloon.update()
     }
 
+    // 풍선-블록 충돌
+    for (const balloon of this.balloons) {
+      for (const block of this.blocks) {
+        if (balloonHitsBlock(balloon, block)) {
+          resolveBalloonBlock(balloon, block)
+        }
+      }
+    }
+
     // 작살-풍선 충돌
     const toRemove = new Set<Balloon>()
     const toAdd: Balloon[] = []
@@ -115,6 +182,19 @@ export class GameEngine {
     if (toRemove.size > 0) {
       this.balloons = this.balloons.filter(b => !toRemove.has(b))
       this.balloons.push(...toAdd)
+    }
+
+    // 작살-블록 충돌
+    if (this.harpoon) {
+      for (const block of this.blocks) {
+        if (harpoonHitsBlock(this.harpoon, block)) {
+          this.harpoon.deactivate()
+          this.harpoon = null
+          block.break()
+          break
+        }
+      }
+      this.blocks = this.blocks.filter(b => b.alive)
     }
 
     // 스테이지 클리어 판정
@@ -144,24 +224,17 @@ export class GameEngine {
     this.input.flush()
   }
 
-  private resetStage() {
-    this.balloons = [new Balloon('large', CANVAS_WIDTH / 2, 1)]
-    this.harpoon = null
-    this.player = new Player()
-    this.state = 'playing'
-  }
-
   private draw() {
     this.ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
     this.ctx.fillStyle = '#1a1a2e'
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+    for (const block of this.blocks) block.draw(this.ctx)
     this.player.draw(this.ctx)
     if (this.harpoon) this.harpoon.draw(this.ctx)
-    for (const balloon of this.balloons) {
-      balloon.draw(this.ctx)
-    }
+    for (const balloon of this.balloons) balloon.draw(this.ctx)
     this.drawHUD(this.ctx)
     if (this.state === 'stageclear') this.drawStageClear(this.ctx)
+    if (this.state === 'missioncomplete') this.drawMissionComplete(this.ctx)
     if (this.state === 'gameover') this.drawGameOver(this.ctx)
   }
 
@@ -178,7 +251,6 @@ export class GameEngine {
   private drawStageClear(ctx: CanvasRenderingContext2D) {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
-
     ctx.textAlign = 'center'
     ctx.fillStyle = '#facc15'
     ctx.font = 'bold 40px monospace'
@@ -189,10 +261,20 @@ export class GameEngine {
     ctx.textAlign = 'left'
   }
 
+  private drawMissionComplete(ctx: CanvasRenderingContext2D) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+    ctx.textAlign = 'center'
+    ctx.fillStyle = '#facc15'
+    ctx.font = 'bold 36px monospace'
+    ctx.fillText('MISSION 1', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 24)
+    ctx.fillText('COMPLETE!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 24)
+    ctx.textAlign = 'left'
+  }
+
   private drawGameOver(ctx: CanvasRenderingContext2D) {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
-
     ctx.fillStyle = '#ffffff'
     ctx.font = 'bold 48px monospace'
     ctx.textAlign = 'center'

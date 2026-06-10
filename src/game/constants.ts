@@ -45,7 +45,7 @@ export const NEXT_SIZE: Record<BalloonSize, BalloonSize | null> = {
 
 export const HARPOON_SPEED = 10
 
-export const PLAYER_LIVES = 10
+export const PLAYER_LIVES = 99
 export const INVINCIBLE_FRAMES = 120
 
 export const BALLOON_SCORE: Record<BalloonSize, number> = {
