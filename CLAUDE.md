@@ -60,6 +60,27 @@ export default defineConfig({
 - `src/main.tsx`: React 루트 마운트 (`StrictMode` 적용)
 - `src/App.tsx`: 최상위 컴포넌트
 
+## 개발 계획 및 설계 문서
+
+### 계획 문서
+- `docs/PLAN.md` — Phase별 목표 및 고객 확인 포인트 목록
+
+### Phase별 설계 문서 (`docs/design/`)
+구현을 시작하기 전에 반드시 해당 Phase의 설계 문서를 먼저 읽는다.
+
+| 파일 | Phase | 내용 |
+|------|-------|------|
+| `docs/design/phase1.md` | Phase 1 | 게임 캔버스 & 플레이어 이동 |
+| `docs/design/phase2.md` | Phase 2 | 풍선 물리 (바운스) |
+| `docs/design/phase3.md` | Phase 3 | 작살 발사 & 풍선 분열 |
+
+> Phase가 추가될 때마다 위 표에 행을 추가한다.
+
+### 설계 문서 활용 규칙
+- 설계 문서에 명시된 **파일 구조**와 **모듈 인터페이스**를 따른다
+- 설계 문서와 다르게 구현해야 할 이유가 생기면, 구현 전에 사용자에게 먼저 확인한다
+- 설계 문서에 정의된 **완료 기준 체크리스트**를 모두 충족해야 해당 Phase 완료로 간주한다
+
 ## TypeScript 설정 주의사항
 
 `tsconfig.app.json`에 엄격한 옵션이 활성화되어 있습니다:
