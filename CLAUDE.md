@@ -76,6 +76,7 @@ export default defineConfig({
 | `docs/design/phase4.md` | Phase 4 | 충돌 판정 & 목숨 시스템 |
 | `docs/design/phase5.md` | Phase 5 | 스테이지 클리어 & 점수 |
 | `docs/design/phase6.md` | Phase 6 | Mission 1 스테이지 구성 (블록 포함) |
+| `docs/design/phase7.md` | Phase 7 | 아이템 드롭 시스템 |
 
 > Phase가 추가될 때마다 위 표에 행을 추가한다.
 

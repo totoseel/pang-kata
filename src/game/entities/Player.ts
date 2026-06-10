@@ -7,6 +7,7 @@ export class Player {
   readonly width = PLAYER_WIDTH
   readonly height = PLAYER_HEIGHT
   private invincibleFrames = 0
+  shielded = false
 
   constructor() {
     this.x = CANVAS_WIDTH / 2 - PLAYER_WIDTH / 2
@@ -30,6 +31,16 @@ export class Player {
 
   hit() {
     this.invincibleFrames = INVINCIBLE_FRAMES
+  }
+
+  shield() { this.shielded = true }
+
+  consumeShield(): boolean {
+    if (this.shielded) {
+      this.shielded = false
+      return true
+    }
+    return false
   }
 
   private shouldRender(): boolean {

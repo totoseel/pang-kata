@@ -57,3 +57,30 @@ export const BALLOON_SCORE: Record<BalloonSize, number> = {
 
 export const STAGE_CLEAR_BONUS = 10_000
 export const STAGE_CLEAR_FRAMES = 180
+
+export type ItemType = 'clock' | 'star' | 'hourglass' | 'shield' | 'dynamite' | 'fruit'
+
+export const ITEM_FALL_SPEED = 2
+export const ITEM_SIZE = 28
+export const ITEM_LIFETIME_FRAMES = 600
+export const ITEM_DROP_CHANCE = 0.3
+export const ITEM_EFFECT_FRAMES = 180
+export const ITEM_SCORE_BONUS = 1_000
+
+export const ITEM_COLOR: Record<ItemType, string> = {
+  clock:     '#facc15',
+  star:      '#fbbf24',
+  hourglass: '#60a5fa',
+  shield:    '#34d399',
+  dynamite:  '#f87171',
+  fruit:     '#fb923c',
+}
+
+export const ITEM_LABEL: Record<ItemType, string> = {
+  clock:     '⏰',
+  star:      '⭐',
+  hourglass: '⏳',
+  shield:    '🛡',
+  dynamite:  '💣',
+  fruit:     '🍎',
+}

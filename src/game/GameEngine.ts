@@ -3,11 +3,17 @@ import { Player } from './entities/Player'
 import { Balloon } from './entities/Balloon'
 import { Harpoon } from './entities/Harpoon'
 import { Block } from './entities/Block'
+import { Item } from './entities/Item'
 import { MISSION1_STAGES } from './stages'
 import {
+  type ItemType,
   BALLOON_SCORE,
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
+  ITEM_DROP_CHANCE,
+  ITEM_EFFECT_FRAMES,
+  ITEM_SCORE_BONUS,
+  ITEM_SIZE,
   PLAYER_LIVES,
   STAGE_CLEAR_BONUS,
   STAGE_CLEAR_FRAMES,
@@ -20,6 +26,21 @@ function harpoonHitsBalloon(harpoon: Harpoon, balloon: Balloon): boolean {
   const dy = balloon.y - clampedY
   const dx = balloon.x - harpoon.x
   return dx * dx + dy * dy <= balloon.radius * balloon.radius
+}
+
+function randomItemType(): ItemType {
+  const types: ItemType[] = ['clock', 'star', 'hourglass', 'shield', 'dynamite', 'fruit']
+  return types[Math.floor(Math.random() * types.length)]
+}
+
+function playerHitsItem(player: Player, item: Item): boolean {
+  const half = ITEM_SIZE / 2
+  return (
+    player.x < item.x + half &&
+    player.x + player.width > item.x - half &&
+    player.y < item.y + half &&
+    player.y + player.height > item.y - half
+  )
 }
 
 function playerHitsBalloon(player: Player, balloon: Balloon): boolean {
@@ -71,12 +92,16 @@ export class GameEngine {
   private balloons: Balloon[]
   private blocks: Block[]
   private harpoon: Harpoon | null = null
+  private items: Item[] = []
   private lives = PLAYER_LIVES
   private score = 0
   private stageIndex = 0
   private state: 'playing' | 'stageclear' | 'missioncomplete' | 'gameover' = 'playing'
   private stageClearFrames = 0
   private animFrameId = 0
+  private frozenFrames = 0
+  private slowedFrames = 0
+  private starUsed = false
 
   constructor(canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d')!
@@ -102,6 +127,10 @@ export class GameEngine {
     this.balloons = data.balloons.map(b => new Balloon(b.size, b.x, b.vxDir))
     this.blocks = data.blocks.map(b => new Block(b))
     this.harpoon = null
+    this.items = []
+    this.frozenFrames = 0
+    this.slowedFrames = 0
+    this.starUsed = false
     this.player = new Player()
     this.stageIndex = index
   }
@@ -172,6 +201,9 @@ export class GameEngine {
           this.score += BALLOON_SCORE[balloon.size]
           toAdd.push(...balloon.getSplitBalloons())
           toRemove.add(balloon)
+          if (Math.random() < ITEM_DROP_CHANCE) {
+            this.items.push(new Item(randomItemType(), balloon.x, balloon.y))
+          }
           this.harpoon.deactivate()
           this.harpoon = null
           break
@@ -197,8 +229,32 @@ export class GameEngine {
       this.blocks = this.blocks.filter(b => b.alive)
     }
 
+    // 시계/모래시계 효과 타이머 감소
+    if (this.frozenFrames > 0) {
+      this.frozenFrames -= 1
+      if (this.frozenFrames === 0) this.balloons.forEach(b => b.unfreeze())
+    }
+    if (this.slowedFrames > 0) {
+      this.slowedFrames -= 1
+      if (this.slowedFrames === 0) this.balloons.forEach(b => b.resetSpeed())
+    }
+
+    // 아이템 낙하 업데이트
+    for (const item of this.items) item.update()
+    this.items = this.items.filter(i => i.active)
+
+    // 플레이어-아이템 충돌
+    for (const item of this.items) {
+      if (playerHitsItem(this.player, item)) {
+        this.applyItem(item.type)
+        item.active = false
+      }
+    }
+
     // 스테이지 클리어 판정
-    if (this.balloons.length === 0) {
+    if (this.starUsed) {
+      this.starUsed = false
+    } else if (this.balloons.length === 0) {
       this.score += STAGE_CLEAR_BONUS
       this.state = 'stageclear'
       this.stageClearFrames = STAGE_CLEAR_FRAMES
@@ -210,11 +266,13 @@ export class GameEngine {
     if (!this.player.isInvincible()) {
       for (const balloon of this.balloons) {
         if (playerHitsBalloon(this.player, balloon)) {
-          this.lives -= 1
-          if (this.lives <= 0) {
-            this.state = 'gameover'
-          } else {
-            this.player.hit()
+          if (!this.player.consumeShield()) {
+            this.lives -= 1
+            if (this.lives <= 0) {
+              this.state = 'gameover'
+            } else {
+              this.player.hit()
+            }
           }
           break
         }
@@ -222,6 +280,35 @@ export class GameEngine {
     }
 
     this.input.flush()
+  }
+
+  private applyItem(type: ItemType) {
+    switch (type) {
+      case 'clock':
+        this.frozenFrames = ITEM_EFFECT_FRAMES
+        this.balloons.forEach(b => b.freeze())
+        break
+      case 'star':
+        this.starUsed = true
+        this.balloons = []
+        this.items = []
+        break
+      case 'hourglass':
+        this.slowedFrames = ITEM_EFFECT_FRAMES
+        this.balloons.forEach(b => b.slowDown())
+        break
+      case 'shield':
+        this.player.shield()
+        break
+      case 'dynamite':
+        this.balloons = this.balloons.map(b =>
+          new Balloon('tiny', b.x, b.currentVx >= 0 ? 1 : -1, b.y)
+        )
+        break
+      case 'fruit':
+        this.score += ITEM_SCORE_BONUS
+        break
+    }
   }
 
   private draw() {
@@ -232,6 +319,7 @@ export class GameEngine {
     this.player.draw(this.ctx)
     if (this.harpoon) this.harpoon.draw(this.ctx)
     for (const balloon of this.balloons) balloon.draw(this.ctx)
+    for (const item of this.items) item.draw(this.ctx)
     this.drawHUD(this.ctx)
     if (this.state === 'stageclear') this.drawStageClear(this.ctx)
     if (this.state === 'missioncomplete') this.drawMissionComplete(this.ctx)
@@ -245,6 +333,11 @@ export class GameEngine {
     ctx.fillText(`♥ x${this.lives}`, 12, 24)
     ctx.textAlign = 'right'
     ctx.fillText(`${this.score}`, CANVAS_WIDTH - 12, 24)
+    let effectY = 48
+    ctx.font = '18px serif'
+    if (this.player.shielded) { ctx.fillText('🛡', CANVAS_WIDTH - 12, effectY); effectY += 22 }
+    if (this.frozenFrames > 0) { ctx.fillText('⏰', CANVAS_WIDTH - 12, effectY); effectY += 22 }
+    if (this.slowedFrames > 0) { ctx.fillText('⏳', CANVAS_WIDTH - 12, effectY) }
     ctx.textAlign = 'left'
   }
 

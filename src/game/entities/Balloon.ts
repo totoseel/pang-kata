@@ -17,6 +17,10 @@ export class Balloon {
   private vx: number
   private vy: number
   readonly radius: number
+  frozen = false
+  slowed = false
+  private baseVx = 0
+  private baseVy = 0
 
   constructor(size: BalloonSize, x: number, vxDirection: 1 | -1, startY?: number) {
     this.size = size
@@ -27,7 +31,31 @@ export class Balloon {
     this.vy = startY !== undefined ? BALLOON_BOUNCE_VY[size] : 0
   }
 
+  get currentVx() { return this.vx }
+
+  freeze() { this.frozen = true }
+  unfreeze() { this.frozen = false }
+
+  slowDown() {
+    if (!this.slowed) {
+      this.baseVx = this.vx
+      this.baseVy = this.vy
+      this.vx *= 0.5
+      this.vy *= 0.5
+      this.slowed = true
+    }
+  }
+
+  resetSpeed() {
+    if (this.slowed) {
+      this.vx = this.baseVx
+      this.vy = this.baseVy
+      this.slowed = false
+    }
+  }
+
   update() {
+    if (this.frozen) return
     this.vy += GRAVITY
     this.x += this.vx
     this.y += this.vy
