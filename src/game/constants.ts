@@ -25,8 +25,8 @@ export const BALLOON_VX: Record<BalloonSize, number> = {
 export const BALLOON_BOUNCE_VY: Record<BalloonSize, number> = {
   large:  -16,
   medium: -13,
-  small:  -10,
-  tiny:   -7,
+  small:  -14,
+  tiny:   -9.8,
 }
 
 export const BALLOON_COLOR: Record<BalloonSize, string> = {
@@ -45,5 +45,15 @@ export const NEXT_SIZE: Record<BalloonSize, BalloonSize | null> = {
 
 export const HARPOON_SPEED = 10
 
-export const PLAYER_LIVES = 3
+export const PLAYER_LIVES = 10
 export const INVINCIBLE_FRAMES = 120
+
+export const BALLOON_SCORE: Record<BalloonSize, number> = {
+  large:  100,
+  medium: 200,
+  small:  300,
+  tiny:   400,
+}
+
+export const STAGE_CLEAR_BONUS = 10_000
+export const STAGE_CLEAR_FRAMES = 180
