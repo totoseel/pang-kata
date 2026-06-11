@@ -5,6 +5,8 @@ export class Harpoon {
   top: number
   readonly bottom: number
   active = true
+  pinned = false
+  private pinnedFrames = 0
 
   constructor(x: number, bottom: number) {
     this.x = x
@@ -12,7 +14,17 @@ export class Harpoon {
     this.top = bottom
   }
 
+  pin(duration: number) {
+    this.pinned = true
+    this.pinnedFrames = duration
+  }
+
   update() {
+    if (this.pinned) {
+      this.pinnedFrames -= 1
+      if (this.pinnedFrames <= 0) this.active = false
+      return
+    }
     this.top -= HARPOON_SPEED
     if (this.top <= 0) {
       this.top = 0

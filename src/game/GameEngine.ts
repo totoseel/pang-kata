@@ -7,6 +7,7 @@ import { Item } from './entities/Item'
 import { MISSION1_STAGES } from './stages'
 import {
   type ItemType,
+  type WeaponType,
   BALLOON_SCORE,
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
@@ -15,8 +16,12 @@ import {
   ITEM_SCORE_BONUS,
   ITEM_SIZE,
   PLAYER_LIVES,
+  POWER_PIN_FRAMES,
   STAGE_CLEAR_BONUS,
   STAGE_CLEAR_FRAMES,
+  VULCAN_FIRE_INTERVAL,
+  WEAPON_DURATION_FRAMES,
+  WEAPON_LABEL,
 } from './constants'
 
 function harpoonHitsBalloon(harpoon: Harpoon, balloon: Balloon): boolean {
@@ -91,7 +96,10 @@ export class GameEngine {
   private player: Player
   private balloons: Balloon[]
   private blocks: Block[]
-  private harpoon: Harpoon | null = null
+  private harpoons: Harpoon[] = []
+  private currentWeapon: WeaponType = 'basic'
+  private weaponFrames = 0
+  private vulcanCooldown = 0
   private items: Item[] = []
   private lives = PLAYER_LIVES
   private score = 0
@@ -126,7 +134,10 @@ export class GameEngine {
     const data = MISSION1_STAGES[index]
     this.balloons = data.balloons.map(b => new Balloon(b.size, b.x, b.vxDir))
     this.blocks = data.blocks.map(b => new Block(b))
-    this.harpoon = null
+    this.harpoons = []
+    this.currentWeapon = 'basic'
+    this.weaponFrames = 0
+    this.vulcanCooldown = 0
     this.items = []
     this.frozenFrames = 0
     this.slowedFrames = 0
@@ -163,18 +174,59 @@ export class GameEngine {
     this.player.update(this.input)
     this.player.tickInvincible()
 
-    // 작살 발사
-    if (this.input.isPressed(' ') && this.harpoon === null) {
-      this.harpoon = new Harpoon(
-        this.player.x + this.player.width / 2,
-        this.player.y,
-      )
+    // 무기 지속 시간 감소 (더블·발칸)
+    if (this.weaponFrames > 0) {
+      this.weaponFrames -= 1
+      if (this.weaponFrames === 0 && this.currentWeapon !== 'power') {
+        this.currentWeapon = 'basic'
+      }
     }
 
-    // 작살 업데이트
-    if (this.harpoon) {
-      this.harpoon.update()
-      if (!this.harpoon.active) this.harpoon = null
+    // 발칸 쿨다운 감소
+    if (this.vulcanCooldown > 0) this.vulcanCooldown -= 1
+
+    // 작살 발사
+    const cx = this.player.x + this.player.width / 2
+    const py = this.player.y
+    switch (this.currentWeapon) {
+      case 'basic':
+        if (this.input.isPressed(' ') && this.harpoons.length === 0) {
+          this.harpoons.push(new Harpoon(cx, py))
+        }
+        break
+      case 'double':
+        if (this.input.isPressed(' ') && this.harpoons.length === 0) {
+          this.harpoons.push(new Harpoon(cx - 10, py))
+          this.harpoons.push(new Harpoon(cx + 10, py))
+        }
+        break
+      case 'power':
+        if (this.input.isPressed(' ') && this.harpoons.every(h => !h.pinned)) {
+          this.harpoons = []
+          this.harpoons.push(new Harpoon(cx, py))
+        }
+        break
+      case 'vulcan':
+        if (this.input.isDown(' ') && this.vulcanCooldown === 0) {
+          this.harpoons.push(new Harpoon(cx, py))
+          this.vulcanCooldown = VULCAN_FIRE_INTERVAL
+        }
+        break
+    }
+
+    // 작살 업데이트 및 파워 작살 천장 도달 시 고정
+    for (const h of this.harpoons) {
+      const wasMoving = !h.pinned && h.top > 0
+      h.update()
+      if (this.currentWeapon === 'power' && wasMoving && h.top === 0 && !h.pinned && h.active) {
+        h.pin(POWER_PIN_FRAMES)
+      }
+    }
+    this.harpoons = this.harpoons.filter(h => h.active)
+
+    // 파워 작살: 모든 작살 소멸 시 기본 복귀
+    if (this.currentWeapon === 'power' && this.harpoons.length === 0) {
+      this.currentWeapon = 'basic'
     }
 
     // 풍선 업데이트
@@ -195,21 +247,21 @@ export class GameEngine {
     const toRemove = new Set<Balloon>()
     const toAdd: Balloon[] = []
 
-    if (this.harpoon) {
+    for (const h of this.harpoons) {
       for (const balloon of this.balloons) {
-        if (harpoonHitsBalloon(this.harpoon, balloon)) {
+        if (harpoonHitsBalloon(h, balloon)) {
           this.score += BALLOON_SCORE[balloon.size]
           toAdd.push(...balloon.getSplitBalloons())
           toRemove.add(balloon)
           if (Math.random() < ITEM_DROP_CHANCE) {
             this.items.push(new Item(randomItemType(), balloon.x, balloon.y))
           }
-          this.harpoon.deactivate()
-          this.harpoon = null
+          h.deactivate()
           break
         }
       }
     }
+    this.harpoons = this.harpoons.filter(h => h.active)
 
     if (toRemove.size > 0) {
       this.balloons = this.balloons.filter(b => !toRemove.has(b))
@@ -217,17 +269,17 @@ export class GameEngine {
     }
 
     // 작살-블록 충돌
-    if (this.harpoon) {
+    for (const h of this.harpoons) {
       for (const block of this.blocks) {
-        if (harpoonHitsBlock(this.harpoon, block)) {
-          this.harpoon.deactivate()
-          this.harpoon = null
-          block.break()
+        if (harpoonHitsBlock(h, block)) {
+          h.deactivate()
+          if (this.currentWeapon !== 'vulcan') block.break()
           break
         }
       }
-      this.blocks = this.blocks.filter(b => b.alive)
     }
+    this.harpoons = this.harpoons.filter(h => h.active)
+    this.blocks = this.blocks.filter(b => b.alive)
 
     // 시계/모래시계 효과 타이머 감소
     if (this.frozenFrames > 0) {
@@ -308,6 +360,18 @@ export class GameEngine {
       case 'fruit':
         this.score += ITEM_SCORE_BONUS
         break
+      case 'weapon_double':
+        this.currentWeapon = 'double'
+        this.weaponFrames = WEAPON_DURATION_FRAMES
+        break
+      case 'weapon_power':
+        this.currentWeapon = 'power'
+        this.weaponFrames = 0
+        break
+      case 'weapon_vulcan':
+        this.currentWeapon = 'vulcan'
+        this.weaponFrames = WEAPON_DURATION_FRAMES
+        break
     }
   }
 
@@ -317,7 +381,7 @@ export class GameEngine {
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
     for (const block of this.blocks) block.draw(this.ctx)
     this.player.draw(this.ctx)
-    if (this.harpoon) this.harpoon.draw(this.ctx)
+    for (const h of this.harpoons) h.draw(this.ctx)
     for (const balloon of this.balloons) balloon.draw(this.ctx)
     for (const item of this.items) item.draw(this.ctx)
     this.drawHUD(this.ctx)
@@ -339,6 +403,12 @@ export class GameEngine {
     if (this.frozenFrames > 0) { ctx.fillText('⏰', CANVAS_WIDTH - 12, effectY); effectY += 22 }
     if (this.slowedFrames > 0) { ctx.fillText('⏳', CANVAS_WIDTH - 12, effectY) }
     ctx.textAlign = 'left'
+    ctx.fillText(WEAPON_LABEL[this.currentWeapon], 12, 48)
+    if (this.weaponFrames > 0) {
+      const ratio = this.weaponFrames / WEAPON_DURATION_FRAMES
+      ctx.fillStyle = '#818cf8'
+      ctx.fillRect(12, 54, 60 * ratio, 4)
+    }
   }
 
   private drawStageClear(ctx: CanvasRenderingContext2D) {

@@ -58,7 +58,22 @@ export const BALLOON_SCORE: Record<BalloonSize, number> = {
 export const STAGE_CLEAR_BONUS = 10_000
 export const STAGE_CLEAR_FRAMES = 180
 
-export type ItemType = 'clock' | 'star' | 'hourglass' | 'shield' | 'dynamite' | 'fruit'
+export type WeaponType = 'basic' | 'double' | 'power' | 'vulcan'
+
+export const WEAPON_DURATION_FRAMES = 600
+export const POWER_PIN_FRAMES = 120
+export const VULCAN_FIRE_INTERVAL = 6
+
+export const WEAPON_LABEL: Record<WeaponType, string> = {
+  basic:  '🗡',
+  double: '🔱',
+  power:  '⚡',
+  vulcan: '🚀',
+}
+
+export type ItemType =
+  | 'clock' | 'star' | 'hourglass' | 'shield' | 'dynamite' | 'fruit'
+  | 'weapon_double' | 'weapon_power' | 'weapon_vulcan'
 
 export const ITEM_FALL_SPEED = 2
 export const ITEM_SIZE = 28
@@ -68,19 +83,25 @@ export const ITEM_EFFECT_FRAMES = 180
 export const ITEM_SCORE_BONUS = 1_000
 
 export const ITEM_COLOR: Record<ItemType, string> = {
-  clock:     '#facc15',
-  star:      '#fbbf24',
-  hourglass: '#60a5fa',
-  shield:    '#34d399',
-  dynamite:  '#f87171',
-  fruit:     '#fb923c',
+  clock:         '#facc15',
+  star:          '#fbbf24',
+  hourglass:     '#60a5fa',
+  shield:        '#34d399',
+  dynamite:      '#f87171',
+  fruit:         '#fb923c',
+  weapon_double: '#818cf8',
+  weapon_power:  '#fde68a',
+  weapon_vulcan: '#6ee7b7',
 }
 
 export const ITEM_LABEL: Record<ItemType, string> = {
-  clock:     '⏰',
-  star:      '⭐',
-  hourglass: '⏳',
-  shield:    '🛡',
-  dynamite:  '💣',
-  fruit:     '🍎',
+  clock:         '⏰',
+  star:          '⭐',
+  hourglass:     '⏳',
+  shield:        '🛡',
+  dynamite:      '💣',
+  fruit:         '🍎',
+  weapon_double: '🔱',
+  weapon_power:  '⚡',
+  weapon_vulcan: '🚀',
 }
