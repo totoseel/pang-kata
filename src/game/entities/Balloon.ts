@@ -99,5 +99,18 @@ export class Balloon {
     ctx.fillStyle = BALLOON_COLOR[this.size]
     ctx.fill()
     ctx.closePath()
+
+    const highlight = ctx.createRadialGradient(
+      this.x - this.radius * 0.3, this.y - this.radius * 0.4, this.radius * 0.05,
+      this.x, this.y, this.radius,
+    )
+    highlight.addColorStop(0, 'rgba(255,255,255,0.55)')
+    highlight.addColorStop(0.5, 'rgba(255,255,255,0.0)')
+    highlight.addColorStop(1, 'rgba(0,0,0,0.15)')
+    ctx.beginPath()
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2)
+    ctx.fillStyle = highlight
+    ctx.fill()
+    ctx.closePath()
   }
 }

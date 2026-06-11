@@ -50,7 +50,20 @@ export class Player {
 
   draw(ctx: CanvasRenderingContext2D) {
     if (!this.shouldRender()) return
+
+    const headR = 8
+    const bodyX = this.x + 4
+    const bodyW = this.width - 8
+    const bodyY = this.y + headR * 2
+    const bodyH = this.height - headR * 2
+
     ctx.fillStyle = '#4ade80'
-    ctx.fillRect(this.x, this.y, this.width, this.height)
+    ctx.fillRect(bodyX, bodyY, bodyW, bodyH)
+
+    ctx.beginPath()
+    ctx.arc(this.x + this.width / 2, this.y + headR, headR, 0, Math.PI * 2)
+    ctx.fillStyle = '#fde68a'
+    ctx.fill()
+    ctx.closePath()
   }
 }

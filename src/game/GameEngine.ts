@@ -4,6 +4,7 @@ import { Balloon } from './entities/Balloon'
 import { Harpoon } from './entities/Harpoon'
 import { Block } from './entities/Block'
 import { Item } from './entities/Item'
+import { ScorePopup } from './entities/ScorePopup'
 import { MISSION1_STAGES } from './stages'
 import {
   type ItemType,
@@ -115,6 +116,8 @@ export class GameEngine {
   private frozenFrames = 0
   private slowedFrames = 0
   private starUsed = false
+  private popups: ScorePopup[] = []
+  private stageIntroFrames = 0
   private callbacks: GameCallbacks
   private endCallbackFired = false
 
@@ -150,8 +153,10 @@ export class GameEngine {
     this.frozenFrames = 0
     this.slowedFrames = 0
     this.starUsed = false
+    this.popups = []
     this.player = new Player()
     this.stageIndex = index
+    this.stageIntroFrames = 90
   }
 
   private advanceStage() {
@@ -180,6 +185,12 @@ export class GameEngine {
     if (this.state === 'stageclear') {
       this.stageClearFrames -= 1
       if (this.stageClearFrames <= 0) this.advanceStage()
+      return
+    }
+
+    if (this.stageIntroFrames > 0) {
+      this.stageIntroFrames -= 1
+      this.input.flush()
       return
     }
 
@@ -263,6 +274,7 @@ export class GameEngine {
       for (const balloon of this.balloons) {
         if (harpoonHitsBalloon(h, balloon)) {
           this.score += BALLOON_SCORE[balloon.size]
+          this.popups.push(new ScorePopup(balloon.x, balloon.y, BALLOON_SCORE[balloon.size]))
           toAdd.push(...balloon.getSplitBalloons())
           toRemove.add(balloon)
           if (Math.random() < ITEM_DROP_CHANCE) {
@@ -306,6 +318,10 @@ export class GameEngine {
     // 아이템 낙하 업데이트
     for (const item of this.items) item.update()
     this.items = this.items.filter(i => i.active)
+
+    // 점수 팝업 업데이트
+    for (const p of this.popups) p.update()
+    this.popups = this.popups.filter(p => p.active)
 
     // 플레이어-아이템 충돌
     for (const item of this.items) {
@@ -391,16 +407,31 @@ export class GameEngine {
     }
   }
 
+  private drawBackground() {
+    const gradients: Array<[string, string]> = [
+      ['#1a6fa8', '#0d1b4a'],
+      ['#c2610a', '#1a1a2e'],
+      ['#0d0d2e', '#000010'],
+    ]
+    const [top, bottom] = gradients[this.stageIndex] ?? ['#1a1a2e', '#0d0d1a']
+    const grad = this.ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT)
+    grad.addColorStop(0, top)
+    grad.addColorStop(1, bottom)
+    this.ctx.fillStyle = grad
+    this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+  }
+
   private draw() {
     this.ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
-    this.ctx.fillStyle = '#1a1a2e'
-    this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+    this.drawBackground()
     for (const block of this.blocks) block.draw(this.ctx)
     this.player.draw(this.ctx)
     for (const h of this.harpoons) h.draw(this.ctx)
     for (const balloon of this.balloons) balloon.draw(this.ctx)
     for (const item of this.items) item.draw(this.ctx)
+    for (const p of this.popups) p.draw(this.ctx)
     this.drawHUD(this.ctx)
+    if (this.stageIntroFrames > 0) this.drawStageIntro(this.ctx)
     if (this.state === 'stageclear') this.drawStageClear(this.ctx)
     if (this.state === 'missioncomplete') this.drawMissionComplete(this.ctx)
     if (this.state === 'gameover') this.drawGameOver(this.ctx)
@@ -425,6 +456,24 @@ export class GameEngine {
       ctx.fillStyle = '#818cf8'
       ctx.fillRect(12, 54, 60 * ratio, 4)
     }
+  }
+
+  private drawStageIntro(ctx: CanvasRenderingContext2D) {
+    const alpha = Math.min(1, this.stageIntroFrames / 30)
+    ctx.save()
+    ctx.globalAlpha = alpha * 0.7
+    ctx.fillStyle = '#000000'
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+    ctx.globalAlpha = alpha
+    ctx.textAlign = 'center'
+    ctx.fillStyle = '#facc15'
+    ctx.font = 'bold 28px monospace'
+    ctx.fillText(`STAGE ${this.stageIndex + 1}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 16)
+    const names = ['MORNING', 'AFTERNOON', 'NIGHT']
+    ctx.fillStyle = '#ffffff'
+    ctx.font = '18px monospace'
+    ctx.fillText(names[this.stageIndex] ?? '', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 16)
+    ctx.restore()
   }
 
   private drawStageClear(ctx: CanvasRenderingContext2D) {

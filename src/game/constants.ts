@@ -57,6 +57,7 @@ export const BALLOON_SCORE: Record<BalloonSize, number> = {
 
 export const STAGE_CLEAR_BONUS = 10_000
 export const STAGE_CLEAR_FRAMES = 180
+export const POPUP_FRAMES = 50
 
 export type WeaponType = 'basic' | 'double' | 'power' | 'vulcan'
 
