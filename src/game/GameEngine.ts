@@ -90,6 +90,11 @@ function resolveBalloonBlock(balloon: Balloon, block: Block) {
   }
 }
 
+type GameCallbacks = {
+  onGameOver?: (score: number) => void
+  onMissionComplete?: (score: number) => void
+}
+
 export class GameEngine {
   private ctx: CanvasRenderingContext2D
   private input: InputManager
@@ -110,13 +115,16 @@ export class GameEngine {
   private frozenFrames = 0
   private slowedFrames = 0
   private starUsed = false
+  private callbacks: GameCallbacks
+  private endCallbackFired = false
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, callbacks: GameCallbacks = {}) {
     this.ctx = canvas.getContext('2d')!
     this.input = new InputManager()
     this.player = new Player()
     this.balloons = []
     this.blocks = []
+    this.callbacks = callbacks
     this.loop = this.loop.bind(this)
     this.loadStage(0)
   }
@@ -150,6 +158,10 @@ export class GameEngine {
     const next = this.stageIndex + 1
     if (next >= MISSION1_STAGES.length) {
       this.state = 'missioncomplete'
+      if (!this.endCallbackFired) {
+        this.endCallbackFired = true
+        this.callbacks.onMissionComplete?.(this.score)
+      }
     } else {
       this.loadStage(next)
       this.state = 'playing'
@@ -322,6 +334,10 @@ export class GameEngine {
             this.lives -= 1
             if (this.lives <= 0) {
               this.state = 'gameover'
+              if (!this.endCallbackFired) {
+                this.endCallbackFired = true
+                this.callbacks.onGameOver?.(this.score)
+              }
             } else {
               this.player.hit()
             }
